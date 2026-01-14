@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run dev)",
+      "Bash(curl:*)",
+      "Bash(npm ls:*)",
+      "Bash(pkill:*)",
+      "Bash(git worktree:*)",
+      "Bash(claude skill list:*)",
+      "Bash(claude:*)",
+      "Bash(npx --yes @anthropic-ai/claude-code:*)"
+    ]
+  }
+}
