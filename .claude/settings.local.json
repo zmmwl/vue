@@ -9,7 +9,8 @@
       "Bash(git worktree:*)",
       "Bash(claude skill list:*)",
       "Bash(claude:*)",
-      "Bash(npx --yes @anthropic-ai/claude-code:*)"
+      "Bash(npx --yes @anthropic-ai/claude-code:*)",
+      "Bash(gh:*)"
     ]
   }
 }

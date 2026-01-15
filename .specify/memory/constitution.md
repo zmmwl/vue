@@ -1,50 +1,166 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+同步影响报告
+==================
+版本变更: none -> 1.0.0
+修改的原则: 无（初始版本）
+新增章节: 核心原则、技术标准、开发工作流、治理
+移除章节: 无
+需要更新的模板:
+  - ✅ plan-template.md - 已审查，Constitution Check 部分已对齐
+  - ✅ spec-template.md - 已审查，需求结构已对齐
+  - ✅ tasks-template.md - 已审查，任务组织已对齐
+后续待办事项: 无
+-->
 
-## Core Principles
+# Vue DAG 编辑器项目宪章
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## 核心原则
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### I. 组件优先架构
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+所有功能必须作为可复用的 Vue 组件实现，具有以下特征：
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+- 组件必须具有适当的独立状态
+- 组件必须通过 props 接收所有外部依赖
+- 组件必须通过事件向父组件通信
+- 组件必须可通过单元测试独立测试
+- 每个组件必须具有清晰、单一的责任
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+**理由**: Vue 的组件模型专为可复用性和可测试性而优化。这确保了 DAG 编辑器在复杂性增长时的可维护性。
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### II. TypeScript 严格模式
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+所有代码必须使用 TypeScript 并启用严格类型检查：
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- 不允许隐式 any 类型
+- 所有函数参数必须声明类型
+- 所有返回类型必须显式声明
+- Props 必须使用 Vue 的 `PropType` 或 `defineProps<T>()` 定义
+- 复杂类型必须导出到 `/src/types/` 目录
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**理由**: DAG 编辑器处理复杂的图结构和关系。TypeScript 的类型系统可防止运行时错误并为重构提供出色的 IDE 支持。
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+### III. 响应式优先于手动状态
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+状态管理必须遵循以下规则：
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+- 使用 Pinia stores 管理跨组件状态
+- 使用 Vue 的 `ref` 和 `reactive` 管理组件本地状态
+- 避免手动 DOM 操作
+- 避免直接修改响应式对象的属性（使用正确的 Vue 方法）
+
+**理由**: Vue 的响应式系统是其性能和简洁性的基础。绕过它会导致错误和维护问题。
+
+### IV. 视觉验证（不可协商）
+
+任何视觉或交互更改必须经过验证：
+
+- 实现之前：创建简单的测试或手动验证计划
+- 实现功能
+- 验证视觉结果是否符合预期
+- 在组件注释中记录边缘情况
+
+**理由**: DAG 编辑器本质上是可视化的。仅靠测试无法验证正确的渲染和交互。
+
+### V. 图数据完整性
+
+图结构必须保持以下不变量：
+
+- 所有节点必须具有唯一 ID
+- 所有边必须引用现有的节点 ID
+- 必须检测并优雅处理循环依赖
+- 图操作必须是原子的或提供回滚能力
+
+**理由**: 破坏的图状态会导致编辑器无法使用。这些不变量防止数据损坏。
+
+## 技术标准
+
+### 语言和框架
+
+- **语言**: TypeScript 5.9+
+- **框架**: Vue 3 组合式 API（`<script setup>`）
+- **构建工具**: Vite
+- **图库**: Vue Flow（核心、背景、控件、小地图）
+- **状态管理**: Pinia
+
+### 代码组织
+
+```
+src/
+├── components/      # 可复用的 Vue 组件
+├── stores/          # Pinia stores
+├── types/           # TypeScript 类型定义
+├── utils/           # 纯工具函数
+├── assets/          # 静态资源
+└── main.ts          # 应用入口点
+```
+
+### 命名约定
+
+- **组件**: PascalCase（例如 `DagEditor.vue`、`NodeToolbar.vue`）
+- **文件**: kebab-case（例如 `dag-editor.ts`、`graph-utils.ts`）
+- **类型**: PascalCase，接口使用 `I` 前缀（例如 `INode`、`IEdge`）
+- **常量**: UPPER_SNAKE_CASE（例如 `MAX_NODES`、`DEFAULT_THEME`）
+- **Store**: camelCase，带 `Store` 后缀（例如 `useGraphStore`）
+
+### 性能要求
+
+- 渲染必须支持 100+ 个节点而不掉帧
+- 图操作必须在 16ms 内完成（60fps 目标）
+- 典型图的初始加载时间必须低于 2 秒
+
+## 开发工作流
+
+### 代码审查要求
+
+所有拉取请求必须：
+
+- 有清晰的更改描述
+- 通过 TypeScript 编译无错误
+- 通过所有现有测试
+- 至少由另一名开发者审查
+- 引用相关问题或规格说明
+
+### 测试策略
+
+- **单元测试**: 用于纯工具函数和业务逻辑
+- **组件测试**: 用于组件行为和 props/事件
+- **视觉测试**: 手动验证渲染效果
+- **集成测试**: 用于图操作和用户流程
+
+### Git 工作流
+
+- 功能分支: `feature/###-name`
+- 修复分支: `fix/###-description`
+- 使用约定式提交: `feat:`、`fix:`、`refactor:`、`docs:`、`style:`、`test:`、`chore:`
+
+## 治理
+
+### 修订程序
+
+宪章修订遵循以下流程：
+
+1. 提出更改并附上清晰的理由
+2. 使用语义化版本号更新版本：
+   - MAJOR: 删除或重新定义核心原则
+   - MINOR: 新增原则或章节
+   - PATCH: 澄清、文字修正
+3. 由项目维护者审查和批准
+4. 更新所有相关模板以保持一致性
+5. 向团队沟通更改
+
+### 版本管理
+
+当前版本: `1.0.0`
+
+版本格式: `MAJOR.MINOR.PATCH`
+
+### 合规审查
+
+- 代码审查期间检查宪章合规性
+- 违规必须附带技术理由说明
+- 持续违规应触发宪章修订
+
+---
+
+**版本**: 1.0.0 | **批准日期**: 2026-01-15 | **最后修订**: 2026-01-15
