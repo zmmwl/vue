@@ -10,7 +10,9 @@
       "Bash(claude skill list:*)",
       "Bash(claude:*)",
       "Bash(npx --yes @anthropic-ai/claude-code:*)",
-      "Bash(gh:*)"
+      "Bash(gh:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
