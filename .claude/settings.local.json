@@ -12,7 +12,12 @@
       "Bash(npx --yes @anthropic-ai/claude-code:*)",
       "Bash(gh:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(ls:*)",
+      "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

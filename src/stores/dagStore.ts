@@ -1,149 +1,314 @@
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { DagGraph, NodeData, EdgeData } from '../types/dag';
-import type { Edge, Node, Connection } from '@vue-flow/core';
+/**
+ * DAG状态管理Store
+ *
+ * 管理多个图的状态、节点和边的CRUD操作
+ * 扩展现有dagStore以支持多图和验证
+ */
 
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import type { GraphNode, GraphEdge } from '../types/graph'
+import { IdGenerator, addNode, deleteNode, updateNode, addEdge, deleteEdge, findOrphanNodes } from '../utils/graph'
+import { validateTaskGraph } from '../types/validation'
+import { graphToJson, downloadJsonFile, generateFilename, importGraph } from '../utils/export'
+
+/**
+ * 图状态
+ */
+interface GraphState {
+  id: string
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  name: string
+  isDirty: boolean
+}
+
+/**
+ * DAG Store
+ */
 export const useDagStore = defineStore('dag', () => {
-  // 节点和边
-  const nodes = ref<Node[]>([]);
-  const edges = ref<Edge[]>([]);
+  // 所有图状态的Map
+  const graphs = ref<Map<string, GraphState>>(new Map())
 
-  // 节点ID计数器
-  let nodeIdCounter = 1;
-  let edgeIdCounter = 1;
+  // ID生成器
+  const idGenerator = new IdGenerator()
 
-  // 生成唯一ID
-  const generateNodeId = () => `node_${nodeIdCounter++}`;
-  const generateEdgeId = () => `edge_${edgeIdCounter++}`;
+  // 当前激活的图ID（从tabStore获取）
+  const activeGraphId = ref<string>('')
 
-  // 添加节点
-  const addNode = (type: string, position: { x: number; y: number }, data: NodeData) => {
-    const id = generateNodeId();
-    const newNode: Node = {
-      id,
+  // 当前选中的节点ID
+  const selectedNodeId = ref<string>('')
+
+  /**
+   * 获取当前激活的图状态
+   */
+  const currentGraph = computed<GraphState | null>(() => {
+    if (!activeGraphId.value) return null
+    return graphs.value.get(activeGraphId.value) || null
+  })
+
+  /**
+   * 获取当前图的节点
+   */
+  const nodes = computed<GraphNode[]>(() => {
+    return currentGraph.value?.nodes || []
+  })
+
+  /**
+   * 获取当前图的连线
+   */
+  const edges = computed<GraphEdge[]>(() => {
+    return currentGraph.value?.edges || []
+  })
+
+  /**
+   * 初始化新图
+   */
+  const initializeGraph = (graphId: string, name?: string): void => {
+    graphs.value.set(graphId, {
+      id: graphId,
+      name: name || `任务图 ${graphs.value.size + 1}`,
+      nodes: [],
+      edges: [],
+      isDirty: false,
+    })
+  }
+
+  /**
+   * 删除图
+   */
+  const deleteGraph = (graphId: string): void => {
+    graphs.value.delete(graphId)
+
+    // 如果删除的是当前激活的图，清空activeGraphId
+    if (activeGraphId.value === graphId) {
+      activeGraphId.value = ''
+    }
+  }
+
+  /**
+   * 添加节点
+   */
+  const addNodeToGraph = (
+    type: string,
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+    graphId?: string,
+  ): GraphNode => {
+    const targetGraphId = graphId || activeGraphId.value
+    const graph = graphs.value.get(targetGraphId)
+
+    if (!graph) {
+      throw new Error(`图 ${targetGraphId} 不存在`)
+    }
+
+    const newNode: GraphNode = {
+      id: idGenerator.generateNodeId(),
       type,
       position,
-      data: {
-        ...data,
-        label: data.label || `Node ${nodeIdCounter - 1}`,
-      },
-    };
-    nodes.value.push(newNode);
-    return newNode;
-  };
-
-  // 删除节点
-  const removeNode = (nodeId: string) => {
-    const index = nodes.value.findIndex((n) => n.id === nodeId);
-    if (index !== -1) {
-      nodes.value.splice(index, 1);
+      data,
     }
-    // 删除相关的边
-    edges.value = edges.value.filter((e) => e.source !== nodeId && e.target !== nodeId);
-  };
 
-  // 更新节点
-  const updateNode = (nodeId: string, data: Partial<NodeData>) => {
-    const node = nodes.value.find((n) => n.id === nodeId);
-    if (node) {
-      node.data = { ...node.data, ...data };
+    graph.nodes = addNode(graph.nodes, newNode)
+    graph.isDirty = true
+
+    return newNode
+  }
+
+  /**
+   * 删除节点
+   */
+  const deleteNodeFromGraph = (nodeId: string): void => {
+    const graphId = activeGraphId.value
+    const graph = graphs.value.get(graphId)
+
+    if (!graph) {
+      return
     }
-  };
 
-  // 添加连接（边）
-  const addConnection = (connection: Connection) => {
-    if (!connection.source || !connection.target) return;
+    const { nodes: newNodes, edges: newEdges } = deleteNode(
+      graph.nodes,
+      graph.edges,
+      nodeId,
+    )
 
-    const newEdge: Edge = {
-      id: generateEdgeId(),
-      source: connection.source,
-      target: connection.target,
-      type: 'default',
-      animated: true,
-      data: connection.data as EdgeData,
-    };
-    edges.value.push(newEdge);
-    return newEdge;
-  };
+    graph.nodes = newNodes
+    graph.edges = newEdges
+    graph.isDirty = true
+  }
 
-  // 删除边
-  const removeEdge = (edgeId: string) => {
-    const index = edges.value.findIndex((e) => e.id === edgeId);
-    if (index !== -1) {
-      edges.value.splice(index, 1);
+  /**
+   * 更新节点
+   */
+  const updateNodeInGraph = (
+    nodeId: string,
+    data: Partial<GraphNode['data']>,
+  ): void => {
+    const graphId = activeGraphId.value
+    const graph = graphs.value.get(graphId)
+
+    if (!graph) {
+      return
     }
-  };
 
-  // 导出为JSON
-  const exportToJson = (): DagGraph => {
+    graph.nodes = updateNode(graph.nodes, nodeId, data)
+    graph.isDirty = true
+  }
+
+  /**
+   * 添加连线
+   */
+  const addConnectionToGraph = (
+    source: string,
+    target: string,
+    data?: Record<string, unknown>,
+    graphId?: string,
+  ): GraphEdge => {
+    const targetGraphId = graphId || activeGraphId.value
+    const graph = graphs.value.get(targetGraphId)
+
+    if (!graph) {
+      throw new Error(`图 ${targetGraphId} 不存在`)
+    }
+
+    const newEdge: GraphEdge = {
+      id: idGenerator.generateEdgeId(),
+      source,
+      target,
+      data,
+    }
+
+    graph.edges = addEdge(graph.edges, newEdge)
+    graph.isDirty = true
+
+    return newEdge
+  }
+
+  /**
+   * 删除连线
+   */
+  const deleteConnectionFromGraph = (edgeId: string): void => {
+    const graphId = activeGraphId.value
+    const graph = graphs.value.get(graphId)
+
+    if (!graph) {
+      return
+    }
+
+    graph.edges = deleteEdge(graph.edges, edgeId)
+    graph.isDirty = true
+  }
+
+  /**
+   * 导出当前图为JSON
+   */
+  const exportCurrentGraph = (): void => {
+    const graph = currentGraph.value
+
+    if (!graph) {
+      return
+    }
+
+    // 从图中提取参与方（节点数据的participantId）
+    const participants = Array.from(
+      new Set(graph.nodes.map(n => (n.data as any)?.participantId || '').filter(p => p))
+    ).map(p => ({ id: p, name: `参与方${p}` }))
+
+    const json = graphToJson(
+      graph.nodes,
+      graph.edges,
+      participants,
+      graph.id,
+      graph.name,
+    )
+
+    const filename = generateFilename(graph.name)
+    downloadJsonFile(json, filename)
+
+    graph.isDirty = false
+  }
+
+  /**
+   * 导入JSON数据到新图
+   */
+  const importGraphData = (
+    jsonData: unknown,
+    newGraphName: string,
+  ): { graphId: string; success: boolean; errors?: string[] } => {
+    const { validation, graphData } = importGraph(jsonData)
+
+    if (!validation.valid) {
+      return {
+        graphId: '',
+        success: false,
+        errors: validation.errors.map(e => `${e.path}: ${e.message}`),
+      }
+    }
+
+    // 创建新图
+    const graphId = idGenerator.generateNodeId().replace('node_', 'graph_')
+    const { elements = [], connections = [] } = graphData as any
+
+    graphs.value.set(graphId, {
+      id: graphId,
+      name: newGraphName,
+      nodes: elements,
+      edges: connections,
+      isDirty: false,
+    })
+
     return {
-      nodes: nodes.value.map((node) => ({
-        id: node.id,
-        type: node.type || 'default',
-        position: node.position,
-        data: node.data as NodeData,
-      })),
-      edges: edges.value.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: edge.type || 'default',
-        data: edge.data as EdgeData,
-      })),
-    };
-  };
+      graphId,
+      success: true,
+    }
+  }
 
-  // 从JSON导入
-  const importFromJson = (graph: DagGraph) => {
-    nodes.value = graph.nodes.map((node) => ({
-      ...node,
-      id: node.id,
-    }));
+  /**
+   * 验证当前图
+   */
+  const validateCurrentGraph = () => {
+    const graph = currentGraph.value
+    if (!graph) return null
 
-    edges.value = graph.edges.map((edge) => ({
-      ...edge,
-      id: edge.id,
-    }));
+    return validateTaskGraph({
+      nodes: graph.nodes,
+      edges: graph.edges,
+    })
+  }
 
-    // 更新计数器
-    const maxNodeId = graph.nodes.reduce((max, node) => {
-      const num = parseInt(node.id.replace('node_', ''));
-      return num > max ? num : max;
-    }, 0);
-    nodeIdCounter = maxNodeId + 1;
+  /**
+   * 检测孤立节点
+   */
+  const findOrphanNodesInCurrentGraph = (): string[] => {
+    const graph = currentGraph.value
+    if (!graph) return []
 
-    const maxEdgeId = graph.edges.reduce((max, edge) => {
-      const num = parseInt(edge.id.replace('edge_', ''));
-      return num > max ? num : max;
-    }, 0);
-    edgeIdCounter = maxEdgeId + 1;
-  };
-
-  // 清空画布
-  const clearCanvas = () => {
-    nodes.value = [];
-    edges.value = [];
-    nodeIdCounter = 1;
-    edgeIdCounter = 1;
-  };
-
-  // 获取图数据（用于VueFlow）
-  const graphData = computed(() => ({
-    nodes: nodes.value,
-    edges: edges.value,
-  }));
+    return findOrphanNodes(graph.nodes, graph.edges)
+  }
 
   return {
+    graphs,
+    activeGraphId,
+    selectedNodeId,
+    currentGraph,
     nodes,
     edges,
-    graphData,
-    addNode,
-    removeNode,
-    updateNode,
-    addConnection,
-    removeEdge,
-    exportToJson,
-    importFromJson,
-    clearCanvas,
-  };
-});
+    initializeGraph,
+    deleteGraph,
+    addNodeToGraph,
+    deleteNodeFromGraph,
+    updateNodeInGraph,
+    addConnectionToGraph,
+    deleteConnectionFromGraph,
+    exportCurrentGraph,
+    importGraphData,
+    validateCurrentGraph,
+    findOrphanNodesInCurrentGraph,
+    setActiveGraphId: (id: string) => {
+      activeGraphId.value = id
+    },
+    setSelectedNodeId: (id: string) => {
+      selectedNodeId.value = id
+    },
+  }
+})

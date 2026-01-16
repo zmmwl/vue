@@ -23,18 +23,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import { VueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
 import { MiniMap } from '@vue-flow/minimap';
 import { useDagStore } from '../stores/dagStore';
 import CustomNode from './CustomNode.vue';
-import type { NodeTemplate, NodeData } from '../types/dag';
+import type { NodeTemplate } from '../types/dag';
 import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
-import '@vue-flow/minimap/dist/style.css';
+import '@vue-flow/background/dist/style.css';
 import '@vue-flow/controls/dist/style.css';
+import '@vue-flow/minimap/dist/style.css';
 
 const store = useDagStore();
 
@@ -49,7 +49,7 @@ const onDrop = (event: DragEvent) => {
 
   const template: NodeTemplate = JSON.parse(templateData);
 
-  store.addNode('custom', {
+  store.addNodeToGraph('custom', {
     x: event.offsetX,
     y: event.offsetY,
   }, {
@@ -69,7 +69,7 @@ const onDragOver = (event: DragEvent) => {
 
 // 连接节点
 const onConnect = (connection: any) => {
-  store.addConnection(connection);
+  store.addConnectionToGraph(connection.source, connection.target, connection.data);
 };
 
 // 点击节点
@@ -79,7 +79,7 @@ const onNodeClick = (event: any) => {
 
 // 删除节点
 const onDeleteNode = (nodeId: string) => {
-  store.removeNode(nodeId);
+  store.deleteNodeFromGraph(nodeId);
 };
 </script>
 
