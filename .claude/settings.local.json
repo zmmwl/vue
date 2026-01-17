@@ -17,7 +17,8 @@
       "Bash(ls:*)",
       "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
       "Bash(lsof:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(npm run lint:*)"
     ]
   }
 }

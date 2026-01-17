@@ -17,12 +17,15 @@
 import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
 
-import type { NodeProps } from '@vue-flow/core'
 import type { DataResourceData } from '../../types/nodes'
 import { PARTICIPANTS } from '../../data/resources'
 
-interface Props extends NodeProps {
-  data?: DataResourceData & { participantId?: string }
+interface Props {
+  id: string
+  label?: string
+  data: DataResourceData & { participantId?: string }
+  selected?: boolean
+  type?: string
 }
 
 const props = defineProps<Props>()
@@ -42,28 +45,29 @@ const handleClick = () => {
 
 <style scoped>
 .data-resource-node {
-  width: 120px;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  border: 3px solid #999;
+  border: 3px solid #bbb;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: visible;
+  position: relative;
 }
 
 .data-resource-node:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
   transform: scale(1.05);
 }
 
 .data-resource-node.selected {
   border-color: #409eff;
-  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.4), 0 4px 12px rgba(64, 158, 255, 0.2);
 }
 
 .node-content {

@@ -17,11 +17,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { NodeProps } from '@vue-flow/core'
 import type { ModelResourceData } from '../../types/nodes'
 
-interface Props extends NodeProps {
-  data?: ModelResourceData
+interface Props {
+  id: string
+  label?: string
+  data: ModelResourceData
+  selected?: boolean
+  type?: string
 }
 
 const props = defineProps<Props>()

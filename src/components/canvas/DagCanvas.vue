@@ -9,8 +9,8 @@
 
     <!-- Vue Flow 画布 -->
     <VueFlow
-      :nodes="nodes"
-      :edges="edges"
+      v-model:nodes="nodes"
+      v-model:edges="edges"
       :node-types="nodeTypes"
       :edge-types="edgeTypes"
       :default-viewport="defaultViewport"
@@ -20,36 +20,40 @@
       :nodes-connectable="true"
       :nodes-draggable="true"
       :elements-selectable="true"
+      :pan-on-scroll="false"
+      :selection-pan-on-drag="true"
       @node-click="onNodeClick"
       @connect="onConnect"
       @nodes-change="onNodesChange"
       @edges-change="onEdgesChange"
     >
       <!-- 背景网格 -->
-      <Background pattern="dots" :gap="20" />
+      <Background pattern="dots" :gap="24" :size="1" />
 
       <!-- 连线箭头定义 -->
-      <svg style="display: none">
+      <svg style="position: absolute; width: 0; height: 0; overflow: hidden;">
         <defs>
+          <!-- 箭头标记（用于输出） -->
           <marker
             id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
+            markerWidth="12"
+            markerHeight="12"
+            refX="10"
+            refY="6"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+            <polygon points="0 0, 12 6, 0 12" fill="#555" />
           </marker>
+          <!-- 梯形标记（用于输入） -->
           <marker
             id="trapezoid"
-            markerWidth="10"
-            markerHeight="8"
-            refX="9"
-            refY="4"
+            markerWidth="14"
+            markerHeight="12"
+            refX="12"
+            refY="6"
             orient="auto"
           >
-            <polygon points="0 0, 10 2, 10 6, 0 8" fill="#555" />
+            <polygon points="0 0, 14 3, 14 9, 0 12" fill="#555" />
           </marker>
         </defs>
       </svg>
@@ -70,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { VueFlow, type Node, type Edge, type NodeChange, type EdgeChange } from '@vue-flow/core'
+import { VueFlow, type Node, type Edge, type NodeChange, type EdgeChange, useVueFlow, Position } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import type { Connection } from '@vue-flow/core'
@@ -97,16 +101,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const dagStore = useDagStore()
+const { viewport } = useVueFlow()
 
 const canvasWidth = ref(1200)
 const canvasHeight = ref(800)
 
-// 自定义节点类型
+// 自定义节点类型（使用 as any 来绕过类型检查）
 const nodeTypes = {
-  dataResource: DataResourceNode,
-  computeTask: ComputeTaskNode,
-  modelResource: ModelResourceNode,
-  computeResource: ComputeResourceNode,
+  dataResource: DataResourceNode as any,
+  computeTask: ComputeTaskNode as any,
+  modelResource: ModelResourceNode as any,
+  computeResource: ComputeResourceNode as any,
 }
 
 // 自定义边类型（目前使用默认类型）
@@ -126,12 +131,20 @@ const currentGraph = computed(() => {
 const nodes = computed<Node[]>(() => {
   const graph = currentGraph.value
   if (!graph) return []
-  return graph.nodes.map(n => ({
-    id: n.id,
-    type: getNodeType(n.type),
-    position: { x: n.position.x, y: n.position.y },
-    data: n.data,
-  }))
+  return graph.nodes.map(n => {
+    const nodeType = getNodeType(n.type)
+    const isComputeTask = nodeType === 'computeTask'
+
+    return {
+      id: n.id,
+      type: nodeType,
+      position: { x: n.position.x, y: n.position.y },
+      data: n.data,
+      // 为计算任务节点设置默认的连接点位置
+      targetPosition: isComputeTask ? Position.Top : undefined,
+      sourcePosition: isComputeTask ? Position.Bottom : undefined,
+    }
+  })
 })
 
 const edges = computed<Edge[]>(() => {
@@ -220,7 +233,18 @@ const onConnect = (connection: Connection) => {
 const onNodesChange = (changes: NodeChange[]) => {
   for (const change of changes) {
     if (change.type === 'remove') {
-      dagStore.deleteNodeFromGraph(change.id)
+      dagStore.deleteNodeFromGraph(change.id, props.graphId)
+    } else if (change.type === 'position' && change.position) {
+      // 更新节点位置到 store
+      const targetGraphId = props.graphId || dagStore.activeGraphId
+      const graph = targetGraphId ? dagStore.graphs.get(targetGraphId) : null
+      if (graph) {
+        const node = graph.nodes.find(n => n.id === change.id)
+        if (node) {
+          node.position = { x: change.position.x, y: change.position.y }
+          graph.isDirty = true
+        }
+      }
     }
   }
 }
@@ -268,11 +292,10 @@ const onDrop = (event: DragEvent) => {
     // 需要考虑 viewport 的变换（平移和缩放）
     const canvasRect = (event.currentTarget as HTMLElement).getBoundingClientRect()
 
-    // 获取 VueFlow 的 viewport 信息来正确计算位置
-    // 这是一个简化的计算，实际可能需要考虑 zoom 和 pan
+    // 考虑 viewport 的平移和缩放
     const position = {
-      x: event.clientX - canvasRect.left,
-      y: event.clientY - canvasRect.top,
+      x: (event.clientX - canvasRect.left - viewport.value.x) / viewport.value.zoom,
+      y: (event.clientY - canvasRect.top - viewport.value.y) / viewport.value.zoom,
     }
 
     console.log('DagCanvas - Position:', {
@@ -337,7 +360,7 @@ watch(() => props.graphId, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #fafafa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8eaed 100%);
 }
 
 :deep(.vue-flow) {
@@ -353,29 +376,47 @@ watch(() => props.graphId, () => {
 }
 
 :deep(.vue-flow__handle) {
+  cursor: crosshair;
+  transition: all 0.2s ease;
+}
+
+/* 通用端点基础样式（会被组件特定的样式覆盖） */
+:deep(.vue-flow__handle:not(.handle-input):not(.handle-output):not(.input-handle):not(.output-handle)) {
   width: 12px;
   height: 12px;
-  background: #409eff;
+  background: #ff6d5a;
   border: 2px solid white;
   border-radius: 50%;
-  cursor: crosshair;
-  transition: all 0.2s;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
-:deep(.vue-flow__handle:hover) {
+:deep(.vue-flow__handle:not(.handle-input):not(.handle-output):not(.input-handle):not(.output-handle):hover) {
   width: 16px;
   height: 16px;
-  background: #67c23a;
-  box-shadow: 0 0 0 4px rgba(103, 194, 58, 0.2);
+  box-shadow: 0 0 0 3px rgba(255, 109, 90, 0.3);
 }
 
-:deep(.vue-flow__handle.connecting) {
-  background: #f56c6c;
-  box-shadow: 0 0 0 4px rgba(245, 108, 108, 0.3);
+:deep(.vue-flow__handle:not(.handle-input):not(.handle-output):not(.input-handle):not(.output-handle).connecting) {
+  background: #00f2a6;
 }
 
-:deep(.vue-flow__handle.source) {
-  background: #67c23a;
+:deep(.vue-flow__edge) {
+  stroke: #666;
+  stroke-width: 2.5;
+}
+
+:deep(.vue-flow__edge.selected) {
+  stroke: #409eff;
+  stroke-width: 3;
+}
+
+:deep(.vue-flow__edge-path) {
+  stroke: #666;
+  stroke-width: 2.5;
+}
+
+:deep(.vue-flow__edge-path.selected) {
+  stroke: #409eff;
 }
 
 .empty-state {

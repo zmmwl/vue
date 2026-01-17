@@ -125,12 +125,12 @@ const swimlaneHeight = computed(() => props.height)
   top: 0;
   left: 0;
   right: 0;
-  height: 100px;
+  height: 120px;
   border-bottom: 2px dashed #409eff;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, rgba(64, 158, 255, 0.05), transparent);
+  background: linear-gradient(180deg, rgba(64, 158, 255, 0.08) 0%, rgba(64, 158, 255, 0.02) 100%);
 }
 
 .bottom-zone {
@@ -138,12 +138,12 @@ const swimlaneHeight = computed(() => props.height)
   bottom: 0;
   left: 0;
   right: 0;
-  height: 100px;
+  height: 120px;
   border-top: 2px dashed #67c23a;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(0deg, rgba(103, 194, 58, 0.05), transparent);
+  background: linear-gradient(0deg, rgba(103, 194, 58, 0.08) 0%, rgba(103, 194, 58, 0.02) 100%);
 }
 
 .zone-label {

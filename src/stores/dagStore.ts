@@ -118,9 +118,9 @@ export const useDagStore = defineStore('dag', () => {
   /**
    * 删除节点
    */
-  const deleteNodeFromGraph = (nodeId: string): void => {
-    const graphId = activeGraphId.value
-    const graph = graphs.value.get(graphId)
+  const deleteNodeFromGraph = (nodeId: string, graphId?: string): void => {
+    const targetGraphId = graphId || activeGraphId.value
+    const graph = graphs.value.get(targetGraphId)
 
     if (!graph) {
       return
